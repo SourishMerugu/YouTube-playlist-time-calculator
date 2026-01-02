@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YouTube Playlist Time Calculator</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>YouTube Playlist Time Calculator</h1>
+      <p>Enter a YouTube playlist URL. We never expose your API key to the browser.</p>
+
+      <div class="card">
+        <label for="playlistUrl">Playlist URL</label>
+        <input id="playlistUrl" type="url" placeholder="https://www.youtube.com/playlist?list=..." />
+
+        <div class="speed-row">
+          <div class="speed-presets">
+            <span>Playback speed</span>
+            <div class="btn-group" id="speedButtons">
+              <button type="button" data-speed="1">1x</button>
+              <button type="button" data-speed="1.25">1.25x</button>
+              <button type="button" data-speed="1.5" class="active">1.5x</button>
+              <button type="button" data-speed="2">2x</button>
+            </div>
+          </div>
+          <div class="speed-custom">
+            <label for="customSpeed">Custom</label>
+            <input id="customSpeed" type="number" step="0.05" min="0.25" max="4" placeholder="1.0" />
+          </div>
+        </div>
+
+        <div class="planner-row">
+          <label for="hoursPerDay">Hours I can watch per day (optional)</label>
+          <input id="hoursPerDay" type="number" step="0.25" min="0.25" max="24" placeholder="2" aria-describedby="hoursHint" />
+          <div id="hoursHint" class="hint" hidden>Enter a value greater than 0 to see estimated days.</div>
+        </div>
+
+        <button id="calcBtn">Calculate</button>
+        <div id="status" class="status" hidden aria-live="polite"></div>
+      </div>
+
+      <div id="result" class="result" hidden aria-live="polite">
+        <h2 id="title"></h2>
+
+        <div class="primary">
+          <div class="label">Total watch time</div>
+          <div id="primaryDuration" class="primary-value"></div>
+          <div id="secondaryDuration" class="secondary"></div>
+        </div>
+
+        <div class="visual">
+          <div class="bar bar-1x" title="Baseline time at 1x"><span>1x</span></div>
+          <div class="bar bar-selected" title="Adjusted time"><span id="barLabel"></span></div>
+        </div>
+
+        <div class="grid">
+          <div class="metric">
+            <div class="label">Videos</div>
+            <div id="count" class="value"></div>
+          </div>
+          <div class="metric">
+            <div class="label">Average Video</div>
+            <div id="avg" class="value"></div>
+          </div>
+          <div class="metric">
+            <div class="label">Longest</div>
+            <div id="longest" class="value"></div>
+          </div>
+          <div class="metric">
+            <div class="label">Shortest</div>
+            <div id="shortest" class="value"></div>
+          </div>
+          <div class="metric" id="plannerMetric" hidden>
+            <div class="label">Days to finish</div>
+            <div id="plannerDays" class="value"></div>
+          </div>
+        </div>
+
+        <div class="comparison">
+          <h3>Speed comparison</h3>
+          <table>
+            <thead>
+              <tr><th>Speed</th><th>Watch time</th></tr>
+            </thead>
+            <tbody id="compareBody"></tbody>
+          </table>
+        </div>
+
+        <details class="tech">
+          <summary>Technical details</summary>
+          <div class="details">
+            <div id="details"></div>
+            <div id="techSeconds" class="muted"></div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <script src="/script.js"></script>
+  </body>
+</html>
