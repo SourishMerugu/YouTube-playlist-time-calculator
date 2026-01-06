@@ -1,72 +1,98 @@
-// -------- URL helpers --------
-function getPlaylistIdFromUrl(url) {
-  try {
-    const u = new URL(url);
-    return u.searchParams.get('list');
-  } catch (_) {
-    return null;
-  }
-}
-
-// -------- Formatting helpers --------
-function secondsToHhmmss(totalSeconds) {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return [hours, minutes.toString().padStart(2, '0'), seconds.toString().padStart(2, '0')].join(':');
-}
-
-function secondsToHuman(totalSeconds) {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.round((totalSeconds % 3600) / 60);
-  const parts = [];
-  if (h > 0) parts.push(`${h}h`);
-  if (m > 0) parts.push(`${m}m`);
-  if (parts.length === 0) return '0m';
-  return parts.join(' ');
-}
-
-// Adjust seconds by playback speed (higher speed => fewer seconds)
-function secondsAtSpeed(totalSeconds, speed) {
-  const s = Math.max(0.25, Math.min(4, parseFloat(speed) || 1));
-  return Math.max(0, Math.round(totalSeconds / s));
-}
-
-// -------- State --------
-const state = {
-  totalSeconds: null,
-  details: null,
-  insights: null,
-  speed: 1.5,
-  title: '',
-  count: 0
-};
-
-// -------- Rendering --------
-function renderAll() {
+document.addEventListener('DOMContentLoaded', function() {
+  // DOM Elements
+  const playlistUrlInput = document.getElementById('playlistUrl');
+  const calcBtn = document.getElementById('calcBtn');
+  const demoBtn = document.getElementById('demoBtn');
+  const statusEl = document.getElementById('status');
   const resultEl = document.getElementById('result');
-  if (!state.totalSeconds) {
-    resultEl.hidden = true;
-    return;
+  const loadingEl = document.getElementById('loading');
+  const playlistPreview = document.getElementById('playlistPreview');
+  const playlistThumbnail = document.getElementById('playlistThumbnail');
+  const playlistTitle = document.getElementById('playlistTitle');
+  const playlistChannel = document.getElementById('playlistChannel');
+  const videoCountEl = document.getElementById('videoCount');
+  const playlistDurationEl = document.getElementById('playlistDuration');
+  const primaryDurationEl = document.getElementById('primaryDuration');
+  const secondaryDurationEl = document.getElementById('secondaryDuration');
+  const currentSpeedEl = document.getElementById('currentSpeed');
+  const timeSavedEl = document.getElementById('timeSaved');
+  const barFillEl = document.querySelector('.bar-fill');
+  const barLabelEl = document.getElementById('barLabel');
+  const videoCountResultEl = document.getElementById('videoCountResult');
+  const avgEl = document.getElementById('avg');
+  const longestEl = document.getElementById('longest');
+  const completionEstimate = document.getElementById('completionEstimate');
+  const daysToCompleteEl = document.getElementById('daysToComplete');
+  const completionDateEl = document.getElementById('completionDate');
+  const hoursPerWeekEl = document.getElementById('hoursPerWeek');
+  const comparisonTable = document.getElementById('comparisonTable');
+  const toggleDetailsBtn = document.getElementById('toggleDetails');
+  const detailsContent = document.getElementById('detailsContent');
+  const playlistIdDisplay = document.getElementById('playlistIdDisplay');
+  const apiResponseTimeEl = document.getElementById('apiResponseTime');
+  const lastUpdatedEl = document.getElementById('lastUpdated');
+  const hpdi = document.getElementById('hoursPerDay');
+
+  // State
+  let currentSpeed = 1.5;
+  let playlistData = null;
+  let playlistId = '';
+
+  // Speed controls
+  const speedButtons = document.querySelectorAll('#speedButtons button');
+  const customSpeedInput = document.getElementById('customSpeed');
+  const speedPresets = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
+
+  // Initialize
+  init();
+
+  function init() {
+    // Set default speed
+    updateSpeed(1.5);
+    
+    // Event Listeners
+    calcBtn.addEventListener('click', calculatePlaylistTime);
+    demoBtn.addEventListener('click', loadDemoPlaylist);
+    customSpeedInput.addEventListener('change', handleCustomSpeedChange);
+    
+    speedButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const speed = parseFloat(btn.dataset.speed);
+        updateSpeed(speed);
+      });
+    });
+    
+    playlistUrlInput.addEventListener('input', handlePlaylistUrlChange);
+    toggleDetailsBtn.addEventListener('click', toggleDetails);
+    hpdi.addEventListener('input', updateCompletionEstimateFromState);
+    
+    // Check for URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const playlistIdParam = urlParams.get('list');
+    if (playlistIdParam) {
+      playlistUrlInput.value = `https://www.youtube.com/playlist?list=${playlistIdParam}`;
+      extractPlaylistId();
+    }
   }
+  // Comparison and planning elements
+  const compareBody = document.getElementById('compareBody');
+  const plannerMetric = document.getElementById('plannerMetric');
+  const plannerDays = document.getElementById('plannerDays');
+  const barLabel = document.getElementById('barLabel');
+
+  // Titles and counts
   const titleEl = document.getElementById('title');
   const countEl = document.getElementById('count');
   const primaryEl = document.getElementById('primaryDuration');
   const secondaryEl = document.getElementById('secondaryDuration');
-  const detailsEl = document.getElementById('details');
-  const techSeconds = document.getElementById('techSeconds');
-  const avgEl = document.getElementById('avg');
-  const longEl = document.getElementById('longest');
-  const shortEl = document.getElementById('shortest');
-  const compareBody = document.getElementById('compareBody');
-  const plannerMetric = document.getElementById('plannerMetric');
-  const plannerDays = document.getElementById('plannerDays');
-  const hoursPerDayInput = document.getElementById('hoursPerDay');
-  const barLabel = document.getElementById('barLabel');
-
-  // Titles and counts
-  titleEl.textContent = state.title;
-  countEl.textContent = state.count;
+  
+  // State for playlist data
+  const state = {
+    totalSeconds: 0,
+    count: 0,
+    title: '',
+    speed: 1.5
+  };
 
   // Primary and secondary durations
   const total = state.totalSeconds;
@@ -116,7 +142,7 @@ function renderAll() {
   techSeconds.textContent = `Total seconds: ${total} • HH:MM:SS: ${secondsToHhmmss(total)}`;
 
   // Study planner
-  const hoursPerDay = parseFloat(hoursPerDayInput.value);
+  const hoursPerDay = parseFloat(hpdi.value);
   const hint = document.getElementById('hoursHint');
   if (!isNaN(hoursPerDay) && hoursPerDay > 0) {
     const secondsPerDay = hoursPerDay * 3600;
@@ -130,57 +156,51 @@ function renderAll() {
   }
 
   document.getElementById('result').hidden = false;
-}
+});
 
-// -------- Calculation and fetch --------
-async function calculate() {
-  const urlInput = document.getElementById('playlistUrl');
-  const statusEl = document.getElementById('status');
-  const resultEl = document.getElementById('result');
-  const calcBtn = document.getElementById('calcBtn');
+   async function calculate() {
+    const urlInput = document.getElementById('playlistUrl');
+    const statusEl = document.getElementById('status');
+    const resultEl = document.getElementById('result');
+    const calcBtn = document.getElementById('calcBtn');
 
-  const url = urlInput.value.trim();
-  const playlistId = getPlaylistIdFromUrl(url);
+    const url = urlInput.value.trim();
+    const playlistId = getPlaylistIdFromUrl(url);
 
-  if (!playlistId) {
-    statusEl.hidden = false;
-    statusEl.className = 'status error';
-    statusEl.textContent = 'Please enter a valid YouTube playlist URL (must contain list=...)';
-    resultEl.hidden = true;
-    return;
-  }
-
-  statusEl.hidden = false;
-  statusEl.className = 'status info';
-  statusEl.textContent = 'Calculating...';
-  resultEl.hidden = true;
-  if (calcBtn) {
-    calcBtn.disabled = true;
-  }
-
-  try {
-    const resp = await fetch(`/api/playlist-time?playlistId=${encodeURIComponent(playlistId)}&speed=${encodeURIComponent(state.speed)}`);
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data?.error || 'Unknown error');
-
-    state.title = data.playlistTitle;
-    state.count = data.videoCount;
-    state.totalSeconds = data.totalSeconds;
-    state.details = data.details;
-    state.insights = data.insights || null;
-
-    statusEl.hidden = true;
-    renderAll();
-  } catch (err) {
-    statusEl.hidden = false;
-    statusEl.className = 'status error';
-    statusEl.textContent = err.message || 'Failed to calculate playlist time.';
-    resultEl.hidden = true;
-  }
-  finally {
-    if (calcBtn) {
-      calcBtn.disabled = false;
+    if (!playlistId) {
+      statusEl.hidden = false;
+      statusEl.className = 'status error';
+      statusEl.textContent = 'Please enter a valid YouTube playlist URL (must contain list=...)';
+      resultEl.hidden = true;
+      return;
     }
+
+    statusEl.hidden = false;
+    statusEl.className = 'status info';
+    statusEl.textContent = 'Calculating...';
+    resultEl.hidden = true;
+    if (calcBtn) {
+      calcBtn.disabled = true;
+    }
+
+    try {
+      const resp = await fetch(`/api/playlist-time?playlistId=${encodeURIComponent(playlistId)}&speed=${encodeURIComponent(state.speed)}`);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || 'Unknown error');
+
+      state.title = data.playlistTitle;
+      state.count = data.videoCount;
+      state.totalSeconds = data.totalSeconds;
+      state.details = data.details;
+      state.insights = data.insights || null;
+
+      statusEl.hidden = true;
+      renderAll();
+    } catch (err) {
+      statusEl.hidden = false;
+      statusEl.className = 'status error';
+      statusEl.textContent = err.message || 'Failed to calculate playlist time.';
+      resultEl.hidden = true;
   }
 }
 
@@ -198,23 +218,34 @@ function setActiveSpeed(speed) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('calcBtn').addEventListener('click', calculate);
+  // Initialize the application
+  init();
 
-  // Default active speed button is 1.5x per HTML
-  document.getElementById('speedButtons').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-speed]');
-    if (!btn) return;
-    setActiveSpeed(parseFloat(btn.dataset.speed));
-  });
+  // Set up speed control event listeners
+  const speedButtons = document.getElementById('speedButtons');
+  const customSpeedInput = document.getElementById('customSpeed');
+  const hoursPerDayInput = document.getElementById('hoursPerDay');
 
-  document.getElementById('customSpeed').addEventListener('input', (e) => {
-    const v = parseFloat(e.target.value);
-    if (!isNaN(v)) {
-      setActiveSpeed(v);
-    }
-  });
+  if (speedButtons) {
+    speedButtons.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-speed]');
+      if (!btn) return;
+      setActiveSpeed(parseFloat(btn.dataset.speed));
+    });
+  }
 
-  document.getElementById('hoursPerDay').addEventListener('input', () => {
-    if (state.totalSeconds) renderAll();
-  });
+  if (customSpeedInput) {
+    customSpeedInput.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      if (!isNaN(v)) {
+        setActiveSpeed(v);
+      }
+    });
+  }
+
+  if (hoursPerDayInput) {
+    hoursPerDayInput.addEventListener('input', () => {
+      if (state.totalSeconds) renderAll();
+    });
+  }
 });
