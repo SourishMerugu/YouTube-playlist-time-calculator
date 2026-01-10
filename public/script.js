@@ -1,5 +1,14 @@
+console.log('script.js loaded');
+const state = {
+  totalSeconds: 0,
+  count: 0,
+  title: '',
+  speed: 1.5,
+  insights: null,
+  details: null
+};
+
 document.addEventListener('DOMContentLoaded', function() {
-  // DOM Elements
   const playlistUrlInput = document.getElementById('playlistUrl');
   const calcBtn = document.getElementById('calcBtn');
   const demoBtn = document.getElementById('demoBtn');
@@ -33,219 +42,380 @@ document.addEventListener('DOMContentLoaded', function() {
   const lastUpdatedEl = document.getElementById('lastUpdated');
   const hpdi = document.getElementById('hoursPerDay');
 
-  // State
-  let currentSpeed = 1.5;
   let playlistData = null;
-  let playlistId = '';
 
-  // Speed controls
   const speedButtons = document.querySelectorAll('#speedButtons button');
-  const customSpeedInput = document.getElementById('customSpeed');
-  const speedPresets = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
+  const speedPresets = [1, 1.25, 1.5, 1.75, 2];
 
-  // Initialize
   init();
 
   function init() {
-    // Set default speed
-    updateSpeed(1.5);
+    setActiveSpeed(1.5);
     
     // Event Listeners
-    calcBtn.addEventListener('click', calculatePlaylistTime);
-    demoBtn.addEventListener('click', loadDemoPlaylist);
-    customSpeedInput.addEventListener('change', handleCustomSpeedChange);
-    
+    calcBtn.addEventListener('click', calculate);
     speedButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const speed = parseFloat(btn.dataset.speed);
-        updateSpeed(speed);
+        setActiveSpeed(speed);
       });
     });
     
-    playlistUrlInput.addEventListener('input', handlePlaylistUrlChange);
-    toggleDetailsBtn.addEventListener('click', toggleDetails);
-    hpdi.addEventListener('input', updateCompletionEstimateFromState);
-    
-    // Check for URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const playlistIdParam = urlParams.get('list');
-    if (playlistIdParam) {
-      playlistUrlInput.value = `https://www.youtube.com/playlist?list=${playlistIdParam}`;
-      extractPlaylistId();
+    if (toggleDetailsBtn) {
+      toggleDetailsBtn.addEventListener('click', toggleDetails);
+    }
+    if (hpdi) {
+      hpdi.addEventListener('input', updateCompletionEstimateFromState);
     }
   }
-  // Comparison and planning elements
-  const compareBody = document.getElementById('compareBody');
-  const plannerMetric = document.getElementById('plannerMetric');
-  const plannerDays = document.getElementById('plannerDays');
-  const barLabel = document.getElementById('barLabel');
+});
 
-  // Titles and counts
-  const titleEl = document.getElementById('title');
-  const countEl = document.getElementById('count');
-  const primaryEl = document.getElementById('primaryDuration');
-  const secondaryEl = document.getElementById('secondaryDuration');
+/**
+ * Extracts playlist ID from a YouTube URL
+ * @param {string} url - YouTube playlist URL
+ * @returns {string|null} - Playlist ID or null if not found
+ */
+function getPlaylistIdFromUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.searchParams.get('list');
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Formats seconds into a human-readable format
+ * @param {number} totalSeconds - Total seconds
+ * @returns {string} Formatted time string (e.g., "2h 30m")
+ */
+function formatDuration(totalSeconds) {
+  if (!totalSeconds) return '0s';
   
-  // State for playlist data
-  const state = {
-    totalSeconds: 0,
-    count: 0,
-    title: '',
-    speed: 1.5
-  };
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  
+  const parts = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (seconds > 0 && hours === 0) parts.push(`${seconds}s`);
+  
+  return parts.join(' ') || '0s';
+}
 
-  // Primary and secondary durations
-  const total = state.totalSeconds;
-  const adjusted = secondsAtSpeed(total, state.speed);
-  primaryEl.textContent = secondsToHuman(total);
-  secondaryEl.textContent = `${secondsToHuman(adjusted)} at ${state.speed}x`;
+/**
+ * Calculates and displays the total duration of the playlist
+ */
+async function calculate() {
+  console.log('calculate() called');
+  const urlInput = document.getElementById('playlistUrl');
+  const statusEl = document.getElementById('status');
+  const resultEl = document.getElementById('result');
+  const calcBtn = document.getElementById('calcBtn');
+  const loadingEl = document.getElementById('loading');
 
-  // Visual bars: 1x is baseline 100%. Selected speed width scales by 1/speed
-  const oneXWidth = 100; // baseline
-  const selectedWidth = Math.max(6, Math.min(100, Math.round(100 / state.speed)));
+  const url = urlInput.value.trim();
+  const playlistId = getPlaylistIdFromUrl(url);
+
+  if (!playlistId) {
+    statusEl.hidden = false;
+    statusEl.className = 'status error';
+    statusEl.textContent = 'Please enter a valid YouTube playlist URL (must contain list=...)';
+    resultEl.hidden = true;
+    return;
+  }
+
+  // Show loading state and hide results
+  statusEl.hidden = false;
+  statusEl.className = 'status info';
+  statusEl.textContent = 'Fetching playlist data...';
+  resultEl.style.display = 'none';
+  resultEl.style.opacity = '0';
+  resultEl.style.pointerEvents = 'none';
+  loadingEl.hidden = false;
+  if (calcBtn) {
+    calcBtn.disabled = true;
+  }
+
+  try {
+    // Call the backend API to get playlist duration
+    const response = await fetch(`/api/playlist-time?playlistId=${encodeURIComponent(playlistId)}&speed=${state.speed || 1.0}`);
+    console.log('response status', response.status);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.log('error response JSON', errorData);
+      throw new Error(errorData.error || 'Failed to fetch playlist data');
+    }
+
+    const data = await response.json();
+    console.log('playlist API data', data);
+    
+    // Update the UI with the playlist data
+    updatePlaylistUI(data);
+    
+  } catch (err) {
+    console.error('Error calculating playlist duration:', err);
+    statusEl.hidden = false;
+    statusEl.className = 'status error';
+    statusEl.textContent = err.message || 'Failed to calculate playlist time. Please try again.';
+    resultEl.hidden = true;
+  } finally {
+    loadingEl.hidden = true;
+    if (calcBtn) {
+      calcBtn.disabled = false;
+    }
+  }
+}
+
+/**
+ * Updates the UI with the playlist data
+ * @param {Object} data - Playlist data from the API
+ */
+function updatePlaylistUI(data) {
+  console.log('updatePlaylistUI called with', data);
+  const statusEl = document.getElementById('status');
+  const resultEl = document.getElementById('result');
+  // In HTML the main title element has id="title"; use that, and fall back to playlistTitle if present
+  const playlistTitleEl = document.getElementById('title') || document.getElementById('playlistTitle');
+  const videoCountEl = document.getElementById('videoCountResult');
+  const durationEl = document.getElementById('primaryDuration');
+  const adjustedDurationEl = document.getElementById('secondaryDuration');
+  const timeSavedEl = document.getElementById('timeSaved');
+  const avgEl = document.getElementById('avg');
+  const longestEl = document.getElementById('longest');
+  
+  // Update state
+  state.totalSeconds = data.totalSeconds || 0;
+  state.count = data.videoCount || 0;
+  state.title = data.playlistTitle || 'Untitled Playlist';
+  state.insights = data.insights || null;
+  state.details = data.details || null;
+  
+  // Update basic info
+  if (playlistTitleEl) {
+    playlistTitleEl.textContent = state.title;
+  }
+  if (videoCountEl) {
+    videoCountEl.textContent = `${state.count} videos`;
+  }
+  
+  // Calculate durations
+  const totalSeconds = state.totalSeconds;
+  const adjustedSeconds = data.adjustedSeconds || Math.round(totalSeconds / state.speed);
+  
+  // Calculate time spent (actual time user will spend watching)
+  const timeSpentSeconds = adjustedSeconds;
+  const timeSpentEl = document.getElementById('timeSpent');
+  if (timeSpentEl) {
+    timeSpentEl.textContent = formatDuration(timeSpentSeconds);
+  }
+  
+  // Update UI
+  if (durationEl) {
+    durationEl.textContent = data.totalDuration || formatDuration(totalSeconds);
+  }
+  
+  // Update speed and adjusted time display
+  const currentSpeedEl = document.getElementById('currentSpeed');
+  const adjustedTimeEl = document.getElementById('adjustedTime');
+  
+  if (currentSpeedEl) {
+    currentSpeedEl.textContent = `${state.speed}x`;
+  }
+  
+  if (adjustedTimeEl) {
+    adjustedTimeEl.textContent = data.adjustedDuration || formatDuration(adjustedSeconds);
+  }
+  
+  // Calculate time saved
+  if (timeSavedEl) {
+    if ((data.playbackSpeed || state.speed) > 1) {
+      const timeSaved = totalSeconds - adjustedSeconds;
+      timeSavedEl.textContent = `(Save ${formatDuration(timeSaved)})`;
+      timeSavedEl.style.display = 'inline';
+    } else {
+      timeSavedEl.style.display = 'none';
+    }
+  }
+  
+  // Update insights if available
+  if (state.insights) {
+    if (avgEl) {
+      avgEl.textContent = formatDuration(state.insights.averageSeconds || 0);
+    }
+    if (longestEl) {
+      longestEl.textContent = formatDuration(state.insights.longestSeconds || 0);
+    }
+  }
+  
+  // Update visual elements
   const bar1x = document.querySelector('.bar-1x');
   const barSel = document.querySelector('.bar-selected');
-  bar1x.style.width = oneXWidth + '%';
-  barSel.style.width = selectedWidth + '%';
-  barLabel.textContent = `${state.speed}x`;
-
-  // Insights
-  if (state.insights) {
-    const { averageSeconds = 0, longestSeconds = 0, shortestSeconds = 0 } = state.insights;
-    avgEl.textContent = secondsToHuman(averageSeconds);
-    longEl.textContent = secondsToHuman(longestSeconds);
-    shortEl.textContent = secondsToHuman(shortestSeconds);
-  } else {
-    avgEl.textContent = secondsToHuman(0);
-    longEl.textContent = secondsToHuman(0);
-    shortEl.textContent = secondsToHuman(0);
+  const barLabel = document.getElementById('barLabel');
+  
+  if (bar1x && barSel && barLabel) {
+    const oneXWidth = 100;
+    const selectedWidth = Math.max(6, Math.min(100, Math.round(100 / (data.playbackSpeed || state.speed))));
+    bar1x.style.width = oneXWidth + '%';
+    barSel.style.width = selectedWidth + '%';
+    barLabel.textContent = `${data.playbackSpeed || state.speed}x`;
   }
-
-  // Comparison table
-  const speeds = [1, 1.25, 1.5, 2];
-  compareBody.innerHTML = '';
-  for (const s of speeds) {
-    const secs = secondsAtSpeed(total, s);
-    const tr = document.createElement('tr');
-    const tdS = document.createElement('td');
-    const tdV = document.createElement('td');
-    tdS.textContent = `${s}x`;
-    tdV.textContent = secondsToHuman(secs);
-    tr.appendChild(tdS);
-    tr.appendChild(tdV);
-    compareBody.appendChild(tr);
-  }
-
-  // Technical details
-  const d = state.details || {};
-  detailsEl.textContent = `Days: ${d.days ?? '-'}, Hours: ${d.hours ?? '-'}, Minutes: ${d.minutes ?? '-'}, Seconds: ${d.seconds ?? '-'}, Total Hours: ${d.totalHours ? d.totalHours.toFixed(2) : '-'}`;
-  techSeconds.textContent = `Total seconds: ${total} • HH:MM:SS: ${secondsToHhmmss(total)}`;
-
-  // Study planner
-  const hoursPerDay = parseFloat(hpdi.value);
-  const hint = document.getElementById('hoursHint');
-  if (!isNaN(hoursPerDay) && hoursPerDay > 0) {
-    const secondsPerDay = hoursPerDay * 3600;
-    const days = Math.ceil(adjusted / secondsPerDay);
-    plannerMetric.hidden = false;
-    plannerDays.textContent = `${days} day${days === 1 ? '' : 's'}`;
-    if (hint) hint.hidden = true;
-  } else {
-    plannerMetric.hidden = true;
-    if (hint) hint.hidden = false;
-  }
-
-  document.getElementById('result').hidden = false;
-});
-
-   async function calculate() {
-    const urlInput = document.getElementById('playlistUrl');
-    const statusEl = document.getElementById('status');
-    const resultEl = document.getElementById('result');
-    const calcBtn = document.getElementById('calcBtn');
-
-    const url = urlInput.value.trim();
-    const playlistId = getPlaylistIdFromUrl(url);
-
-    if (!playlistId) {
-      statusEl.hidden = false;
-      statusEl.className = 'status error';
-      statusEl.textContent = 'Please enter a valid YouTube playlist URL (must contain list=...)';
-      resultEl.hidden = true;
-      return;
-    }
-
-    statusEl.hidden = false;
-    statusEl.className = 'status info';
-    statusEl.textContent = 'Calculating...';
-    resultEl.hidden = true;
-    if (calcBtn) {
-      calcBtn.disabled = true;
-    }
-
-    try {
-      const resp = await fetch(`/api/playlist-time?playlistId=${encodeURIComponent(playlistId)}&speed=${encodeURIComponent(state.speed)}`);
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data?.error || 'Unknown error');
-
-      state.title = data.playlistTitle;
-      state.count = data.videoCount;
-      state.totalSeconds = data.totalSeconds;
-      state.details = data.details;
-      state.insights = data.insights || null;
-
-      statusEl.hidden = true;
-      renderAll();
-    } catch (err) {
-      statusEl.hidden = false;
-      statusEl.className = 'status error';
-      statusEl.textContent = err.message || 'Failed to calculate playlist time.';
-      resultEl.hidden = true;
-  }
-}
-
-// -------- Speed controls --------
-function setActiveSpeed(speed) {
-  state.speed = Math.max(0.25, Math.min(4, parseFloat(speed) || 1));
-  const btns = document.querySelectorAll('#speedButtons button');
-  btns.forEach(b => b.classList.toggle('active', parseFloat(b.dataset.speed) === state.speed));
-  const statusEl = document.getElementById('status');
-  if (state.totalSeconds) {
-    // Re-render without refetch
+  
+  // Hide status and show results with smooth transition
+  if (statusEl) {
     statusEl.hidden = true;
-    renderAll();
+    statusEl.textContent = ''; // Clear any status text
+  }
+  // Show result with smooth transition
+  resultEl.style.display = 'block';
+  resultEl.style.opacity = '1';
+  resultEl.style.pointerEvents = 'auto';
+  resultEl.style.transition = 'opacity 0.3s ease-in-out';
+  
+  // Update completion estimate
+  updateCompletionEstimateFromState();
+}
+
+/**
+ * Updates the completion estimate based on the current state
+ */
+function updateCompletionEstimateFromState() {
+  const hoursPerDayInput = document.getElementById('hoursPerDay');
+  const plannerMetric = document.getElementById('plannerMetric');
+  const plannerDays = document.getElementById('plannerDays');
+  const hint = document.getElementById('hoursHint');
+  
+  if (hoursPerDayInput && plannerMetric && plannerDays) {
+    const hoursPerDay = parseFloat(hoursPerDayInput.value);
+    if (!isNaN(hoursPerDay) && hoursPerDay > 0 && state.totalSeconds > 0) {
+      const secondsPerDay = hoursPerDay * 3600;
+      const adjustedSeconds = Math.round(state.totalSeconds / state.speed);
+      const days = Math.ceil(adjustedSeconds / secondsPerDay);
+      
+      plannerMetric.hidden = false;
+      plannerDays.textContent = `${days} day${days === 1 ? '' : 's'}`;
+      if (hint) hint.hidden = true;
+      
+      // Set completion date
+      const completionDate = new Date();
+      completionDate.setDate(completionDate.getDate() + days);
+      const completionDateEl = document.getElementById('completionDate');
+      if (completionDateEl) {
+        completionDateEl.textContent = completionDate.toLocaleDateString();
+      }
+    } else {
+      plannerMetric.hidden = true;
+      if (hint) hint.hidden = false;
+    }
   }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  // Initialize the application
-  init();
+/**
+ * Sets the playback speed and updates the UI
+ * @param {number} speed - The playback speed (e.g., 1.5 for 1.5x)
+ */
+function setActiveSpeed(speed) {
+  // Update the state with the new speed
+  state.speed = Math.max(0.25, Math.min(4, parseFloat(speed) || 1));
+  
+  // Update active state of speed buttons
+  const btns = document.querySelectorAll('#speedButtons button');
+  btns.forEach(btn => {
+    const btnSpeed = parseFloat(btn.dataset.speed);
+    btn.classList.toggle('active', Math.abs(btnSpeed - state.speed) < 0.01);
+  });
+  
+  // If we have data, update the UI with the new speed
+  if (state.totalSeconds > 0) {
+    // Recalculate the adjusted time with the new speed
+    const adjustedSeconds = Math.round(state.totalSeconds / state.speed);
+    const adjustedDurationEl = document.getElementById('secondaryDuration');
+    if (adjustedDurationEl) {
+      adjustedDurationEl.textContent = `${formatDuration(adjustedSeconds)} at ${state.speed}x`;
+    }
+    
+    // Update the time saved display
+    const timeSavedEl = document.getElementById('timeSaved');
+    if (timeSavedEl && state.speed > 1) {
+      const timeSaved = state.totalSeconds - adjustedSeconds;
+      timeSavedEl.textContent = `(Save ${formatDuration(timeSaved)})`;
+      timeSavedEl.style.display = 'inline';
+    } else if (timeSavedEl) {
+      timeSavedEl.style.display = 'none';
+    }
+    
+    // Update the visual bars
+    const bar1x = document.querySelector('.bar-1x');
+    const barSel = document.querySelector('.bar-selected');
+    const barLabel = document.getElementById('barLabel');
+    
+    if (bar1x && barSel && barLabel) {
+      const oneXWidth = 100;
+      const selectedWidth = Math.max(6, Math.min(100, Math.round(100 / state.speed)));
+      bar1x.style.width = oneXWidth + '%';
+      barSel.style.width = selectedWidth + '%';
+      barLabel.textContent = `${state.speed}x`;
+    }
+    
+    // Update completion estimate
+    updateCompletionEstimateFromState();
+  }
+}
 
-  // Set up speed control event listeners
-  const speedButtons = document.getElementById('speedButtons');
-  const customSpeedInput = document.getElementById('customSpeed');
+/**
+ * Renders all UI components based on current state
+ */
+function renderAll() {
+  const primaryEl = document.getElementById('primaryDuration');
+  const secondaryEl = document.getElementById('secondaryDuration');
+  const barLabel = document.getElementById('barLabel');
+  const bar1x = document.querySelector('.bar-1x');
+  const barSel = document.querySelector('.bar-selected');
   const hoursPerDayInput = document.getElementById('hoursPerDay');
-
-  if (speedButtons) {
-    speedButtons.addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-speed]');
-      if (!btn) return;
-      setActiveSpeed(parseFloat(btn.dataset.speed));
-    });
+  const plannerMetric = document.getElementById('plannerMetric');
+  const plannerDays = document.getElementById('plannerDays');
+  const hint = document.getElementById('hoursHint');
+  
+  // Update durations
+  const total = state.totalSeconds;
+  const adjusted = Math.round(total / state.speed);
+  
+  if (primaryEl) primaryEl.textContent = formatDuration(total);
+  if (secondaryEl) secondaryEl.textContent = `${formatDuration(adjusted)} at ${state.speed}x`;
+  
+  // Update speed bars
+  if (bar1x && barSel && barLabel) {
+    const oneXWidth = 100;
+    const selectedWidth = Math.max(6, Math.min(100, Math.round(100 / state.speed)));
+    bar1x.style.width = oneXWidth + '%';
+    barSel.style.width = selectedWidth + '%';
+    barLabel.textContent = `${state.speed}x`;
   }
-
-  if (customSpeedInput) {
-    customSpeedInput.addEventListener('input', (e) => {
-      const v = parseFloat(e.target.value);
-      if (!isNaN(v)) {
-        setActiveSpeed(v);
+  
+  // Update completion estimate
+  if (hoursPerDayInput && plannerMetric && plannerDays) {
+    const hoursPerDay = parseFloat(hoursPerDayInput.value);
+    if (!isNaN(hoursPerDay) && hoursPerDay > 0) {
+      const secondsPerDay = hoursPerDay * 3600;
+      const days = Math.ceil(adjusted / secondsPerDay);
+      plannerMetric.hidden = false;
+      plannerDays.textContent = `${days} day${days === 1 ? '' : 's'}`;
+      if (hint) hint.hidden = true;
+      
+      // Set completion date
+      const completionDate = new Date();
+      completionDate.setDate(completionDate.getDate() + days);
+      const completionDateEl = document.getElementById('completionDate');
+      if (completionDateEl) {
+        completionDateEl.textContent = completionDate.toLocaleDateString();
       }
-    });
+    } else {
+      plannerMetric.hidden = true;
+      if (hint) hint.hidden = false;
+    }
   }
-
-  if (hoursPerDayInput) {
-    hoursPerDayInput.addEventListener('input', () => {
-      if (state.totalSeconds) renderAll();
-    });
-  }
-});
+  
+  // No need to update insights UI as it's been removed
+}

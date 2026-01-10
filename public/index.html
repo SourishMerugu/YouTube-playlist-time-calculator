@@ -29,18 +29,14 @@
               <span class="tooltiptext">Paste the URL of any public YouTube playlist</span>
             </span>
           </label>
-          <div class="input-with-button">
-            <input 
-              id="playlistUrl" 
-              type="url" 
-              placeholder="https://www.youtube.com/playlist?list=..." 
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <button id="demoBtn" class="demo-btn" type="button">
-              <i class="fas fa-magic"></i> Try Demo
-            </button>
-          </div>
+          <input 
+            id="playlistUrl" 
+            type="url" 
+            placeholder="https://www.youtube.com/playlist?list=..." 
+            autocomplete="off"
+            spellcheck="false"
+            class="full-width"
+          />
         </div>
 
         <!-- Playlist Preview -->
@@ -71,35 +67,18 @@
               </span>
             </label>
             <div class="btn-group" id="speedButtons">
-              <button type="button" data-speed="0.25" title="0.25x">0.25x</button>
-              <button type="button" data-speed="0.5" title="0.5x">0.5x</button>
-              <button type="button" data-speed="0.75" title="0.75x">0.75x</button>
               <button type="button" data-speed="1" class="active" title="1x (Normal)">1x</button>
               <button type="button" data-speed="1.25" title="1.25x">1.25x</button>
               <button type="button" data-speed="1.5" title="1.5x">1.5x</button>
+              <button type="button" data-speed="1.75" title="1.75x">1.75x</button>
               <button type="button" data-speed="2" title="2x">2x</button>
             </div>
-          </div>
-          <div class="speed-custom">
-            <label for="customSpeed">
-              <i class="fas fa-sliders-h"></i> Custom Speed
-            </label>
-            <input 
-              id="customSpeed" 
-              type="number" 
-              step="0.05" 
-              min="0.25" 
-              max="4" 
-              value="1.5" 
-              placeholder="1.0" 
-              aria-label="Custom playback speed"
-            />
           </div>
         </div>
 
         <div class="planner-row">
           <label for="hoursPerDay">
-            <i class="far fa-clock"></i> Daily Watch Time (optional)
+            <i class="far fa-clock"></i> Daily Watch Time 
             <span class="tooltip">
               <i class="fas fa-info-circle"></i>
               <span class="tooltiptext">Enter your daily watch time to see completion estimates</span>
@@ -128,26 +107,17 @@
           <i class="fas fa-spinner fa-spin"></i>
           <span class="status-message">Processing playlist...</span>
         </div>
-      </div>
 
-      <!-- Loading Spinner -->
-      <div id="loading" class="loading" hidden>
-        <div class="loading-spinner"></div>
-        <p>Fetching playlist data...</p>
-      </div>
+        <!-- Loading Spinner -->
+        <div id="loading" class="loading" hidden>
+          <div class="loading-spinner"></div>
+          <p>Fetching playlist data...</p>
+        </div>
 
-      <!-- Results Section -->
-      <div id="result" class="result" hidden aria-live="polite">
+        <!-- Results Section -->
+        <div id="result" class="result" aria-live="polite">
         <div class="result-header">
           <h2 id="title">Playlist Time Calculation</h2>
-          <div class="share-buttons">
-            <a href="#" class="share-btn share-twitter" id="shareTwitter">
-              <i class="fab fa-twitter"></i> Tweet
-            </a>
-            <a href="#" class="share-btn share-facebook" id="shareFacebook">
-              <i class="fab fa-facebook-f"></i> Share
-            </a>
-          </div>
         </div>
 
         <div class="primary animate-fade-in-up">
@@ -155,26 +125,16 @@
             <i class="far fa-clock"></i> Total Watch Time
           </div>
           <div id="primaryDuration" class="primary-value">00:00:00</div>
+          <div class="time-spent">
+            <i class="fas fa-user-clock"></i> Time Spent: <span id="timeSpent">00:00:00</span>
+          </div>
           <div id="secondaryDuration" class="secondary">
-            At <span id="currentSpeed">1.5x</span> speed: 00:00:00
-          </div>
-          
-          <div class="visual">
-            <div class="bar-container">
-              <div class="bar-label">
-                <span>Watch Time</span>
-                <span id="timeSaved">0% time saved</span>
-              </div>
-              <div class="bar">
-                <div class="bar-fill" style="width: 0%;"></div>
-              </div>
+            <div class="speed-display">
+              <span class="speed-label">Playback Speed:</span>
+              <span id="currentSpeed" class="speed-value">1.5x</span>
             </div>
+            <div class="adjusted-time">Adjusted time: <span id="adjustedTime">00:00:00</span></div>
           </div>
-        </div>
-
-        <div class="visual">
-          <div class="bar bar-1x" title="Baseline time at 1x"><span>1x</span></div>
-          <div class="bar bar-selected" title="Adjusted time"><span id="barLabel"></span></div>
         </div>
 
         <div class="metrics-grid">
@@ -193,33 +153,12 @@
             <div class="label">Longest</div>
             <div id="longest" class="value"></div>
           </div>
-          <div class="metric">
-            <div class="label">Shortest</div>
-            <div id="shortest" class="value"></div>
-          </div>
           <div class="metric" id="plannerMetric" hidden>
             <div class="label">Days to finish</div>
             <div id="plannerDays" class="value"></div>
           </div>
         </div>
 
-        <div class="comparison">
-          <h3>Speed comparison</h3>
-          <table>
-            <thead>
-              <tr><th>Speed</th><th>Watch time</th></tr>
-            </thead>
-            <tbody id="compareBody"></tbody>
-          </table>
-        </div>
-
-        <details class="tech">
-          <summary>Technical details</summary>
-          <div class="details">
-            <div id="details"></div>
-            <div id="techSeconds" class="muted"></div>
-          </div>
-        </details>
       </div>
     </div>
 
