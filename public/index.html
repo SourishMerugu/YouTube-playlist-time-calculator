@@ -5,59 +5,144 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>YouTube Playlist Time Calculator</title>
     <link rel="stylesheet" href="/style.css" />
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div class="container">
-      <h1>YouTube Playlist Time Calculator</h1>
-      <p>Enter a YouTube playlist URL. We never expose your API key to the browser.</p>
+      <div class="header">
+        <div class="logo">
+          <i class="fab fa-youtube" style="color: #ff0000; margin-right: 10px;"></i>
+          <h1>YouTube Playlist Time Calculator</h1>
+        </div>
+        <p class="subtitle">Calculate the total watch time of any YouTube playlist. Perfect for planning your learning journey!</p>
+      </div>
 
       <div class="card">
-        <label for="playlistUrl">Playlist URL</label>
-        <input id="playlistUrl" type="url" placeholder="https://www.youtube.com/playlist?list=..." />
+        <div class="input-group">
+          <label for="playlistUrl">
+            <i class="fas fa-link"></i> YouTube Playlist URL
+            <span class="tooltip">
+              <i class="fas fa-info-circle"></i>
+              <span class="tooltiptext">Paste the URL of any public YouTube playlist</span>
+            </span>
+          </label>
+          <input 
+            id="playlistUrl" 
+            type="url" 
+            placeholder="https://www.youtube.com/playlist?list=..." 
+            autocomplete="off"
+            spellcheck="false"
+            class="full-width"
+          />
+        </div>
+
+        <!-- Playlist Preview -->
+        <div id="playlistPreview" class="playlist-preview">
+          <div class="playlist-thumbnail">
+            <img src="" alt="Playlist thumbnail" id="playlistThumbnail" />
+            <div class="play-icon">
+              <i class="fas fa-play"></i>
+            </div>
+          </div>
+          <div class="playlist-info">
+            <h3 class="playlist-title" id="playlistTitle">Loading playlist...</h3>
+            <div class="playlist-channel" id="playlistChannel"></div>
+            <div class="playlist-stats">
+              <span id="videoCount">0 videos</span>
+              <span id="playlistDuration">• 0:00</span>
+            </div>
+          </div>
+        </div>
 
         <div class="speed-row">
           <div class="speed-presets">
-            <span>Playback speed</span>
+            <label>
+              <i class="fas fa-tachometer-alt"></i> Playback Speed
+              <span class="tooltip">
+                <i class="fas fa-info-circle"></i>
+                <span class="tooltiptext">Adjust speed to see how it affects total watch time</span>
+              </span>
+            </label>
             <div class="btn-group" id="speedButtons">
-              <button type="button" data-speed="1">1x</button>
-              <button type="button" data-speed="1.25">1.25x</button>
-              <button type="button" data-speed="1.5" class="active">1.5x</button>
-              <button type="button" data-speed="2">2x</button>
+              <button type="button" data-speed="1" class="active" title="1x (Normal)">1x</button>
+              <button type="button" data-speed="1.25" title="1.25x">1.25x</button>
+              <button type="button" data-speed="1.5" title="1.5x">1.5x</button>
+              <button type="button" data-speed="1.75" title="1.75x">1.75x</button>
+              <button type="button" data-speed="2" title="2x">2x</button>
             </div>
-          </div>
-          <div class="speed-custom">
-            <label for="customSpeed">Custom</label>
-            <input id="customSpeed" type="number" step="0.05" min="0.25" max="4" placeholder="1.0" />
           </div>
         </div>
 
         <div class="planner-row">
-          <label for="hoursPerDay">Hours I can watch per day (optional)</label>
-          <input id="hoursPerDay" type="number" step="0.25" min="0.25" max="24" placeholder="2" aria-describedby="hoursHint" />
+          <label for="hoursPerDay">
+            <i class="far fa-clock"></i> Daily Watch Time 
+            <span class="tooltip">
+              <i class="fas fa-info-circle"></i>
+              <span class="tooltiptext">Enter your daily watch time to see completion estimates</span>
+            </span>
+          </label>
+          <div class="input-with-unit">
+            <input 
+              id="hoursPerDay" 
+              type="number" 
+              step="0.25" 
+              min="0.25" 
+              max="24" 
+              placeholder="2" 
+              aria-describedby="hoursHint"
+            />
+            <span class="input-unit">hours/day</span>
+          </div>
           <div id="hoursHint" class="hint" hidden>Enter a value greater than 0 to see estimated days.</div>
         </div>
 
-        <button id="calcBtn">Calculate</button>
-        <div id="status" class="status" hidden aria-live="polite"></div>
-      </div>
-
-      <div id="result" class="result" hidden aria-live="polite">
-        <h2 id="title"></h2>
-
-        <div class="primary">
-          <div class="label">Total watch time</div>
-          <div id="primaryDuration" class="primary-value"></div>
-          <div id="secondaryDuration" class="secondary"></div>
+        <button id="calcBtn" class="calculate-btn">
+          <i class="fas fa-calculator"></i> Calculate Total Time
+        </button>
+        
+        <div id="status" class="status" role="alert" hidden aria-live="polite">
+          <i class="fas fa-spinner fa-spin"></i>
+          <span class="status-message">Processing playlist...</span>
         </div>
 
-        <div class="visual">
-          <div class="bar bar-1x" title="Baseline time at 1x"><span>1x</span></div>
-          <div class="bar bar-selected" title="Adjusted time"><span id="barLabel"></span></div>
+        <!-- Loading Spinner -->
+        <div id="loading" class="loading" hidden>
+          <div class="loading-spinner"></div>
+          <p>Fetching playlist data...</p>
         </div>
 
-        <div class="grid">
-          <div class="metric">
-            <div class="label">Videos</div>
+        <!-- Results Section -->
+        <div id="result" class="result" aria-live="polite">
+        <div class="result-header">
+          <h2 id="title">Playlist Time Calculation</h2>
+        </div>
+
+        <div class="primary animate-fade-in-up">
+          <div class="label">
+            <i class="far fa-clock"></i> Total Watch Time
+          </div>
+          <div id="primaryDuration" class="primary-value">00:00:00</div>
+          <div class="time-spent">
+            <i class="fas fa-user-clock"></i> Time Spent: <span id="timeSpent">00:00:00</span>
+          </div>
+          <div id="secondaryDuration" class="secondary">
+            <div class="speed-display">
+              <span class="speed-label">Playback Speed:</span>
+              <span id="currentSpeed" class="speed-value">1.5x</span>
+            </div>
+            <div class="adjusted-time">Adjusted time: <span id="adjustedTime">00:00:00</span></div>
+          </div>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric animate-fade-in-up delay-100">
+            <div class="label">
+              <i class="fas fa-film"></i> Total Videos
+            </div>
+            <div id="videoCountResult" class="value">0</div>
             <div id="count" class="value"></div>
           </div>
           <div class="metric">
@@ -68,33 +153,12 @@
             <div class="label">Longest</div>
             <div id="longest" class="value"></div>
           </div>
-          <div class="metric">
-            <div class="label">Shortest</div>
-            <div id="shortest" class="value"></div>
-          </div>
           <div class="metric" id="plannerMetric" hidden>
             <div class="label">Days to finish</div>
             <div id="plannerDays" class="value"></div>
           </div>
         </div>
 
-        <div class="comparison">
-          <h3>Speed comparison</h3>
-          <table>
-            <thead>
-              <tr><th>Speed</th><th>Watch time</th></tr>
-            </thead>
-            <tbody id="compareBody"></tbody>
-          </table>
-        </div>
-
-        <details class="tech">
-          <summary>Technical details</summary>
-          <div class="details">
-            <div id="details"></div>
-            <div id="techSeconds" class="muted"></div>
-          </div>
-        </details>
       </div>
     </div>
 

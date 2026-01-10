@@ -1,5 +1,6 @@
 const { calculatePlaylistDuration } = require('../index');
-
+require('dotenv').config();
+console.log('YOUTUBE_API_KEY present?', !!process.env.YOUTUBE_API_KEY);
 module.exports = async (req, res) => {
   try {
     if (req.method !== 'GET') {
