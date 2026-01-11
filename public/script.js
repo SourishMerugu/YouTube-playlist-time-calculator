@@ -331,32 +331,23 @@ function setActiveSpeed(speed) {
   if (state.totalSeconds > 0) {
     // Recalculate the adjusted time with the new speed
     const adjustedSeconds = Math.round(state.totalSeconds / state.speed);
-    const adjustedDurationEl = document.getElementById('secondaryDuration');
-    if (adjustedDurationEl) {
-      adjustedDurationEl.textContent = `${formatDuration(adjustedSeconds)} at ${state.speed}x`;
+    
+    // Update the current speed display
+    const currentSpeedEl = document.getElementById('currentSpeed');
+    if (currentSpeedEl) {
+      currentSpeedEl.textContent = `${state.speed}x`;
     }
     
-    // Update the time saved display
-    const timeSavedEl = document.getElementById('timeSaved');
-    if (timeSavedEl && state.speed > 1) {
-      const timeSaved = state.totalSeconds - adjustedSeconds;
-      timeSavedEl.textContent = `(Save ${formatDuration(timeSaved)})`;
-      timeSavedEl.style.display = 'inline';
-    } else if (timeSavedEl) {
-      timeSavedEl.style.display = 'none';
+    // Update the adjusted time display
+    const adjustedTimeEl = document.getElementById('adjustedTime');
+    if (adjustedTimeEl) {
+      adjustedTimeEl.textContent = formatDuration(adjustedSeconds);
     }
     
-    // Update the visual bars
-    const bar1x = document.querySelector('.bar-1x');
-    const barSel = document.querySelector('.bar-selected');
-    const barLabel = document.getElementById('barLabel');
-    
-    if (bar1x && barSel && barLabel) {
-      const oneXWidth = 100;
-      const selectedWidth = Math.max(6, Math.min(100, Math.round(100 / state.speed)));
-      bar1x.style.width = oneXWidth + '%';
-      barSel.style.width = selectedWidth + '%';
-      barLabel.textContent = `${state.speed}x`;
+    // Update the time spent display
+    const timeSpentEl = document.getElementById('timeSpent');
+    if (timeSpentEl) {
+      timeSpentEl.textContent = formatDuration(adjustedSeconds);
     }
     
     // Update completion estimate
@@ -369,10 +360,9 @@ function setActiveSpeed(speed) {
  */
 function renderAll() {
   const primaryEl = document.getElementById('primaryDuration');
-  const secondaryEl = document.getElementById('secondaryDuration');
-  const barLabel = document.getElementById('barLabel');
-  const bar1x = document.querySelector('.bar-1x');
-  const barSel = document.querySelector('.bar-selected');
+  const currentSpeedEl = document.getElementById('currentSpeed');
+  const adjustedTimeEl = document.getElementById('adjustedTime');
+  const timeSpentEl = document.getElementById('timeSpent');
   const hoursPerDayInput = document.getElementById('hoursPerDay');
   const plannerMetric = document.getElementById('plannerMetric');
   const plannerDays = document.getElementById('plannerDays');
@@ -382,16 +372,24 @@ function renderAll() {
   const total = state.totalSeconds;
   const adjusted = Math.round(total / state.speed);
   
-  if (primaryEl) primaryEl.textContent = formatDuration(total);
-  if (secondaryEl) secondaryEl.textContent = `${formatDuration(adjusted)} at ${state.speed}x`;
+  // Update primary duration (total time)
+  if (primaryEl) {
+    primaryEl.textContent = formatDuration(total);
+  }
   
-  // Update speed bars
-  if (bar1x && barSel && barLabel) {
-    const oneXWidth = 100;
-    const selectedWidth = Math.max(6, Math.min(100, Math.round(100 / state.speed)));
-    bar1x.style.width = oneXWidth + '%';
-    barSel.style.width = selectedWidth + '%';
-    barLabel.textContent = `${state.speed}x`;
+  // Update speed display
+  if (currentSpeedEl) {
+    currentSpeedEl.textContent = `${state.speed}x`;
+  }
+  
+  // Update adjusted time display
+  if (adjustedTimeEl) {
+    adjustedTimeEl.textContent = formatDuration(adjusted);
+  }
+  
+  // Update time spent display
+  if (timeSpentEl) {
+    timeSpentEl.textContent = formatDuration(adjusted);
   }
   
   // Update completion estimate
